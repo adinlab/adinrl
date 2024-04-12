@@ -1,0 +1,8 @@
+pytorch
+numpy
+matplotlib
+gymnasium
+robosuite
+dm-control
+h5py
+seaborn
