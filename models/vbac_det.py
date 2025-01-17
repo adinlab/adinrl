@@ -9,17 +9,18 @@ from torch.special import erfinv
 import torch.nn as nn
 from torch.autograd import grad
 from models.basic.ac import ActorCritic
+
 # from models.basic.sequential.sequential_critic import CriticEnsemble, Critic
 # from nets.sequential_critic_nets import SequentialCriticNet
 from models.basic.critic import Critics, Critic
 from nets.critic_nets import CriticNet
 
 
-
 #####################################################################
 class VBCritic(Critic):  # ProbCritic
     def __init__(self, arch, args, n_state, n_action):
         super().__init__(arch, args, n_state, n_action)
+
 
 #####################################################################
 class VBCriticEnsemble(Critics):  # CriticEnsemble  Critics
@@ -30,10 +31,7 @@ class VBCriticEnsemble(Critics):  # CriticEnsemble  Critics
             torch.tensor(0, requires_grad=True, device=args.device, dtype=torch.float32)
         )
         self.optim_p = torch.optim.Adam([self.p], lr=args.learning_rate)
-        self.n_data = (
-            args.buffer_size
-        ) 
-
+        self.n_data = args.buffer_size
 
     @torch.no_grad
     def get_bellman_target(self, r, sp, done, actor):
@@ -41,7 +39,7 @@ class VBCriticEnsemble(Critics):  # CriticEnsemble  Critics
         ap, ep = actor.act(sp)
         if ep is None:
             ep = 0
-        mu= self.Q_t(sp, ap)
+        mu = self.Q_t(sp, ap)
         # mu_new = torch.cat(mu, dim=1).mean(dim=1, keepdim=True)
         # var_new = torch.cat(mu, dim=1).var(dim=1, keepdim=True).clamp(1e-6, None)
         mu_new = mu.mean(dim=0)
@@ -50,8 +48,7 @@ class VBCriticEnsemble(Critics):  # CriticEnsemble  Critics
         mu_t = r.unsqueeze(-1) + (self.args.gamma * qp_t * (1 - done.unsqueeze(-1)))
         var_t = self.args.gamma**2 * (var_new)  # + 1e-4   .var(dim=0).clamp(1e-6, None)
         return mu_t, var_t, done
-    
-     
+
     def update(self, s, a, y):
         self.optim.zero_grad()
         q_mu = self.Q(s, a).mean(dim=0)
@@ -76,6 +73,7 @@ class VBCriticEnsemble(Critics):  # CriticEnsemble  Critics
         self.optim_p.step()
         # print("after",self.p)
 
+
 #####################################################################
 class ProbSoftActor(SequentialSoftActor):
     def __init__(self, arch, args, n_state, n_action):
@@ -93,7 +91,7 @@ class ProbSoftActor(SequentialSoftActor):
     def loss(self, s, critics):
         a, e = self.act(s)
         q_list = critics.Q(s, a)
-        #q_mu = critics.reduce(q_list)
+        # q_mu = critics.reduce(q_list)
         q_mu = q_list.mean(dim=0)
         return (-q_mu + self.log_alpha.exp() * e).mean(), e
 
@@ -103,7 +101,11 @@ class VariationalBayesianACDet(ActorCritic):
     _agent_name = "VBAC_det"
 
     def __init__(
-        self, env, args, actor_nn=ActorNetProbabilistic, critic_nn= CriticNet #SequentialCriticNet   CriticNet
+        self,
+        env,
+        args,
+        actor_nn=ActorNetProbabilistic,
+        critic_nn=CriticNet,  # SequentialCriticNet   CriticNet
     ):
         super().__init__(
             env,
@@ -115,4 +117,3 @@ class VariationalBayesianACDet(ActorCritic):
         )
 
         self.actor.c = 0.05
-

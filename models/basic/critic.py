@@ -5,7 +5,6 @@ import torch as th
 from torch import nn, func as thf
 
 
-
 class Critic(nn.Module):
     def __init__(self, arch, args, n_state, n_action):
         super().__init__()
@@ -207,29 +206,23 @@ class Critics(nn.Module):
         qp_t = self.reduce(qp) - alpha * (ep if ep is not None else 0)
         y = r.unsqueeze(-1) + (self.args.gamma * qp_t * (1 - done.unsqueeze(-1)))
         return y
-    
-
-
 
     def save_params(self, path):
         self.unstack(target=False, single=True, net_id=None)
         self.unstack(target=True, single=True, net_id=None)
         params_list = []
-        for i in range (len(self.critics)):
+        for i in range(len(self.critics)):
             params_list.append(self.load_params(self.critics[i]))
-        torch.save(params_list, path )
-            
-    def load_params(self,critic):
+        torch.save(params_list, path)
+
+    def load_params(self, critic):
         params = {
-            "params_model": critic.model.state_dict(),   
-            "params_target": critic.target.state_dict(),   
+            "params_model": critic.model.state_dict(),
+            "params_target": critic.target.state_dict(),
             "optim": self.optim.state_dict(),
         }
         params_th = {
-        k: v if isinstance(v, torch.Tensor) else v  # Ensure the values are tensors
-        for k, v in params.items()
-}
+            k: v if isinstance(v, torch.Tensor) else v  # Ensure the values are tensors
+            for k, v in params.items()
+        }
         return params_th
-        
-
-

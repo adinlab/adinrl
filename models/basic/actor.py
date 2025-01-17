@@ -3,6 +3,8 @@ import torch as th
 from torch import nn
 import numpy
 from utils.utils import tonumpy
+
+
 #####################################################################
 class Actor(nn.Module):
     def __init__(self, arch, args, n_state, n_action, has_target=False):
@@ -96,8 +98,8 @@ class Actor(nn.Module):
         }
 
         params_th = {
-        k: v if isinstance(v, torch.Tensor) else v  # Ensure the values are tensors
-        for k, v in params.items()
-}
+            k: v if isinstance(v, torch.Tensor) else v  # Ensure the values are tensors
+            for k, v in params.items()
+        }
 
         torch.save(params_th, path)

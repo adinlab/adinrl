@@ -16,6 +16,7 @@ import wrappers
 from utils.environment.noisywrappers import NoisyActionWrapper, NoisyObservationWrapper
 from utils.environment.reward_wrappers import PositionDelayWrapper
 
+
 def make_env(
     env_name: str,
     seed: int,
@@ -57,7 +58,6 @@ def make_env(
         env.set_task(task)
         env = wrappers.OldToNewGym(env, duration=env.max_path_length)
         save_folder = None
-
 
     else:
         domain_name, task_name = env_name.split("-")
