@@ -7,7 +7,7 @@ from agents.base_agent import Agent
 
 class TwinDelayedDeepDeterministicPolicyGradient(Agent):
     def __init__(self, env, args, actor_nn, critic_nn):
-        super(TwinDelayedDeepDeterministicPolicyGradient, self).__init__(env, args)
+        super().__init__(env, args)
         self._alpha = 0.05  # 0.2
         self._sigma = np.sqrt(0.1)
         self._sigma_target = np.sqrt(0.2)
@@ -15,14 +15,22 @@ class TwinDelayedDeepDeterministicPolicyGradient(Agent):
         self._d = 2
         self._critic_loss_fcn = nn.MSELoss()
         #
-        self._actor = actor_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-        self._actor_target = actor_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-        self._critic_1 = critic_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-        self._critic_2 = critic_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-        self._critic_1_target = critic_nn(self._nx, self._nu, args.n_hidden).to(
+        self._actor = actor_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
             self.device
         )
-        self._critic_2_target = critic_nn(self._nx, self._nu, args.n_hidden).to(
+        self._actor_target = actor_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+            self.device
+        )
+        self._critic_1 = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+            self.device
+        )
+        self._critic_2 = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+            self.device
+        )
+        self._critic_1_target = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+            self.device
+        )
+        self._critic_2_target = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
             self.device
         )
 
@@ -106,4 +114,9 @@ class TwinDelayedDeepDeterministicPolicyGradient(Agent):
             a += noise
         a = a.clamp(-1.000, 1.000).cpu().numpy().squeeze(0)
         return a
-    
+
+    def Q_value(self, s, a):
+        s = torch.from_numpy(s).view(1, -1).float().to(self.device)
+        a = torch.from_numpy(a).view(1, -1).float().to(self.device)
+        q = self._critic_1(s, a)
+        return q.item()

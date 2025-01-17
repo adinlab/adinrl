@@ -6,7 +6,7 @@ import gymnasium as gym
 class TakeKey(gym.ObservationWrapper):
 
     def __init__(self, env, take_key):
-        super(TakeKey, self).__init__(env)
+        super().__init__(env)
         self._take_key = take_key
 
         assert take_key in self.observation_space.spaces

@@ -1,54 +1,20 @@
 """
 This is adapted from https://github.com/ikostrikov/jaxrl
 
-Robosuite adapted from
-https://robosuite.ai/docs/algorithms/benchmarking.html
-https://github.com/ARISE-Initiative/robosuite-benchmark/util/rlkit_utils.py#L31 for suite.make command
-https://github.com/ARISE-Initiative/robosuite-benchmark/util/arguments.py#L23 for the suite make args
 """
 
 import gymnasium as gym
+
 import random
-import robosuite as suite
-from robosuite.controllers import load_controller_config
+
 from gymnasium.wrappers import RescaleAction
-from gymnasium.wrappers.pixel_observation import PixelObservationWrapper
 from typing import Optional
 import numpy as np
 import torch
-from gymnasium.wrappers import TransformObservation
-from gymnasium.wrappers import TransformReward
 
 import wrappers
-
-
-def make_robosuite(env_name):
-    env_name = env_name.split("_")[1]
-    
-    env = wrappers.OldToNewGym(
-        wrappers.RoboSuiteWrapper(
-            suite.make(
-                env_name=env_name,
-                robots="Panda",
-                horizon=500,
-                control_freq=20,  # Hz
-                reward_scale=1.0,
-                hard_reset=True,
-                ignore_done=True,
-                has_renderer=False,
-                has_offscreen_renderer=False,
-                use_object_obs=True,
-                use_camera_obs=False,
-                reward_shaping=True,
-                controller_configs=load_controller_config(
-                    default_controller="OSC_POSE"
-                ),
-            )
-        ),
-        duration=500,
-    )
-    return env
-
+from utils.environment.noisywrappers import NoisyActionWrapper, NoisyObservationWrapper
+from utils.environment.reward_wrappers import PositionDelayWrapper
 
 def make_env(
     env_name: str,
@@ -67,6 +33,10 @@ def make_env(
     action_concat: int = 1,
     obs_concat: int = 1,
     continuous: bool = True,
+    noisy_act: float = 0.0,
+    noisy_obs: float = 0.0,
+    position_delay: float = None,
+    ctrl_cost_weight: float = None,
 ) -> gym.Env:
 
     # Check if the env is in gym.
@@ -79,19 +49,29 @@ def make_env(
     elif "Navigation" in env_name:
         env = wrappers.NavigationND(env_name)
 
-    elif "robosuite" in env_name:
-        env = make_robosuite(env_name)
+    elif "metaworld" in env_name:
+        env_name = "_".join(env_name.split("_")[1:])
+        mt1 = metaworld.MT1(env_name, seed=0)
+        env = mt1.train_classes[env_name]()
+        task = random.choice(mt1.train_tasks)
+        env.set_task(task)
+        env = wrappers.OldToNewGym(env, duration=env.max_path_length)
         save_folder = None
+
 
     else:
         domain_name, task_name = env_name.split("-")
-        env = wrappers.DMCEnv(
-            domain_name=domain_name, task_name=task_name, task_kwargs={"random": seed}
+        env = wrappers.DMCGym(
+            domain=domain_name, task=task_name, task_kwargs={"random": seed}
         )
+        # env=dmc2gym.make(domain_name=domain_name, task_name=task_name, seed=seed)
 
     if flatten and isinstance(env.observation_space, gym.spaces.Dict):
         env = gym.wrappers.FlattenObservation(env)
         env = wrappers.FlattenAction(env)
+
+    # if add_episode_monitor:
+    #     env = wrappers.EpisodeMonitor(env)
 
     if action_repeat > 1:
         env = wrappers.RepeatAction(env, action_repeat)
@@ -99,6 +79,13 @@ def make_env(
     if continuous:
         env = RescaleAction(env, -1.0, 1.0)
 
+    # if action_concat > 1:
+    #     env = wrappers.ConcatAction(env, action_concat)
+    # if obs_concat > 1:
+    #     env = wrappers.ConcatObs(env, obs_concat)
+
+    # if save_folder is not None:
+    #     env = wrappers.VideoRecorder(env, save_folder=save_folder)
 
     # TODO: should probably move this inside DMC
     if from_pixels:
@@ -129,13 +116,28 @@ def make_env(
     if sticky:
         env = wrappers.StickyActionEnv(env)
 
-    env = TransformObservation(
-        env,
-        lambda obs: obs
-        + ((5 * np.sqrt(np.linalg.norm(obs)) / (obs.shape[0]) ** 2))
-        * np.random.randn(*obs.shape),
-    )
-    
+    if noisy_act > 0:
+        env = NoisyActionWrapper(env, noise_act=noisy_act)
+    if noisy_obs > 0:
+        env = NoisyObservationWrapper(env, noise_obs=noisy_obs)
+
+    if position_delay is not None or ctrl_cost_weight is not None:
+        print("Using sparse version")
+        env = PositionDelayWrapper(
+            env, position_delay=position_delay, ctrl_w=ctrl_cost_weight
+        )
+
+    ############################################################
+    # perturb environment observation and reward
+    # env = TransformReward(env, lambda r: 0.01*r)
+    # env = TransformObservation(env, lambda obs: obs + 0.01 * np.random.randn(*obs.shape))
+    # env = TransformObservation(
+    #    env,
+    #    lambda obs: obs
+    #    + ((5 * np.sqrt(np.linalg.norm(obs)) / (obs.shape[0]) ** 2))
+    #    * np.random.randn(*obs.shape),
+    # )
+    ############################################################
 
     env.reset(seed=seed)
     env.action_space.seed(seed)

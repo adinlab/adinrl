@@ -45,14 +45,16 @@ class OUNoise(object):
 
 class DeepDeterministicPolicyGradient(Agent):
     def __init__(self, env, args, actor_nn, critic_nn):
-        super(DeepDeterministicPolicyGradient, self).__init__(env, args)
+        super().__init__(env, args)
 
         self._alpha = 0.05
         self.critic_loss_fcn = nn.MSELoss()
         #
         if actor_nn is not None:
-            self.actor = actor_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-            self.actor_target = actor_nn(self._nx, self._nu, args.n_hidden).to(
+            self.actor = actor_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+                self.device
+            )
+            self.actor_target = actor_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
                 self.device
             )
             self.hard_update(
@@ -62,8 +64,10 @@ class DeepDeterministicPolicyGradient(Agent):
                 self.actor.parameters(), args.learning_rate
             )
 
-        self.critic = critic_nn(self._nx, self._nu, args.n_hidden).to(self.device)
-        self.critic_target = critic_nn(self._nx, self._nu, args.n_hidden).to(
+        self.critic = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
+            self.device
+        )
+        self.critic_target = critic_nn(self.dim_obs, self.dim_act, args.n_hidden).to(
             self.device
         )
         self.hard_update(
@@ -107,35 +111,36 @@ class DeepDeterministicPolicyGradient(Agent):
             s, a, r, sp, done, step = self.experience_memory.sample_random(
                 self.args.batch_size
             )
-            self.critic_learn(s, a, r, sp, done)
             self.actor_learn(s)
+            self.critic_learn(s, a, r, sp, done)
             # soft update of target critic networks
             self.soft_update(self.actor, self.actor_target)
             self.soft_update(self.critic, self.critic_target)
 
     @torch.no_grad()
-    def select_action(self, s, is_training=True):
+    def select_action(self, s):
         s = torch.from_numpy(s).unsqueeze(0).float().to(self.device)
-        a, _ = self.actor(s, is_training)
+        a, _ = self.actor(s)
         a = a.cpu().numpy().squeeze(0)
-        if is_training:
-            a = self.noise_func.get_action(a, self.episode_counter * self.step_counter)
-            self.step_counter += 1
+
+        if self.step_counter == 0:
+            self.noise_func.reset()
+
+        a = self.noise_func.get_action(a, self.episode_counter * self.step_counter)
+        self.step_counter += 1
+        self.episode_counter = self.step_counter % self.env.max_episode_steps
 
         return a
-    
-    def reset(self):
-        self.noise_func.reset()
-        self.episode_counter += 1
-        self.step_counter = 0
 
     def soft_update(self, local_model, target_model):
         for target_param, local_param in zip(
             target_model.parameters(), local_model.parameters()
         ):
-            target_param.data.copy_(
-                self._tau * local_param.data + (1.0 - self._tau) * target_param.data
-            )
+            # target_param.data.copy_(
+            #     self._tau * local_param.data + (1.0 - self._tau) * target_param.data
+            # )
+            target_param.data.mul_(1.0 - self.args.tau)
+            target_param.data.add_(self.args.tau * local_param.data)
 
     def hard_update(self, local_model, target_model):
         for target_param, local_param in zip(

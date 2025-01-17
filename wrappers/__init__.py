@@ -4,7 +4,8 @@ https://github.com/ikostrikov/jaxrl/tree/main/jaxrl/wrappers
 """
 
 from .absorbing_states import AbsorbingStatesWrapper
-from .dmc_env import DMCEnv
+
+# from .dmc_env import DMCEnv
 from .episode_monitor import EpisodeMonitor
 from .frame_stack import FrameStack
 from .repeat_action import RepeatAction
@@ -19,5 +20,7 @@ from .concat_action import ConcatAction
 from .concat_obs import ConcatObs
 
 from .old_to_new_gym import OldToNewGym
-from .robosuite_wrapper import RoboSuiteWrapper
+
+# from .robosuite_wrapper import RoboSuiteWrapper
 from .navigation import NavigationND
+from .dmc_gym import DMCGym
